@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+
   push:
     branches:
       - main
@@ -11,10 +12,12 @@ on:
 permissions:
   id-token: write
   contents: read
+  pull-requests: read
 
 jobs:
-  terraform:
-    name: Terraform CI/CD
+
+  terraform-check:
+    name: Terraform Check
     runs-on: ubuntu-latest
 
     steps:
@@ -24,18 +27,11 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
 
       - name: Terraform Init
         run: terraform init
-
-      - name: Terraform Format
-        run: terraform fmt -check -recursive
 
       - name: Terraform Validate
         run: terraform validate
@@ -43,6 +39,29 @@ jobs:
       - name: Terraform Plan
         run: terraform plan
 
+
+  terraform-apply:
+    name: Terraform Apply
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve
